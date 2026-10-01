@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Driver Performance | Control Tower</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#0b0d10;--card:#15181d;--text:#f5f7fa;--muted:#a7adb8;--line:#2a2f37;
+--accent:#ee4d2d;--danger:#d92d20;--warn:#d9822b;--good:#18864b;--blue:#3867d6;
+--shadow:0 8px 28px rgba(0,0,0,.35);--radius:14px}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
+header{background:linear-gradient(135deg,#090a0c,#17191d);color:#fff;padding:22px 28px;position:sticky;top:0;z-index:10;box-shadow:0 4px 16px #0002}
+.head{max-width:1500px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+h1{font-size:22px}.subtitle{color:#cbd1dc;font-size:12px;margin-top:5px}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,.fileLabel{border:1px solid #3a3f47;border-radius:9px;padding:10px 14px;cursor:pointer;font-weight:700;background:#1b1f25;color:#fff;font-size:13px;line-height:1.2;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center}
+button:hover,.fileLabel:hover{background:#ee4d2d;border-color:#ee4d2d;color:#fff}
+.fileLabel input{display:none}
+main{max-width:1500px;margin:20px auto;padding:0 18px}
+.filters{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px;box-shadow:var(--shadow);display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-bottom:15px}
+label{font-size:11px;color:var(--muted);font-weight:800;display:block;margin-bottom:5px}
+select,input{width:100%;padding:10px;border:1px solid #3a3f47;border-radius:9px;background:#0f1115;color:var(--text);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);min-width:0}
+.card .k{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase}
+.card .v{font-size:27px;font-weight:900;margin-top:6px}
+.card .s{font-size:11px;color:var(--muted);margin-top:4px}
+.grid2{display:grid;grid-template-columns:1.25fr .75fr;gap:15px;margin-bottom:15px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:15px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:15px}
+.panel h2{font-size:14px;margin:0 0 4px}.desc{font-size:11px;color:var(--muted);margin-bottom:12px}
+.chartbox{height:310px}.chartbox.small{height:260px}.chartbox.tall{height:560px}
+.tableWrap{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;table-layout:auto}
+th{position:sticky;top:0;background:#1d2127;color:#ffb39f;text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);z-index:2}
+th[data-sort]{cursor:pointer;user-select:none}
+th[data-sort]:hover{background:#2a2f37}
+th .sort-arrow{font-size:10px;margin-left:3px;opacity:0.4}
+th.sort-active .sort-arrow{opacity:1;color:#ee4d2d}
+td{padding:7px 6px;border-bottom:1px solid #292e36}
+tr:hover td{background:#20242a}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:900}
+.crit{background:#fde8e7;color:#a51f1a}.low{background:#fff0e1;color:#9b5700}.reg{background:#fff8cf;color:#806b00}
+.good{background:#e7f6ec;color:#14733f}.vgood{background:#def7ee;color:#0c7450}.excel{background:#e3efff;color:#2459a8}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.danger{color:var(--danger);font-weight:900}.success{color:var(--good);font-weight:800}
+.ds-red{background:#fde8e7;color:#a51f1a !important;font-weight:900;border-radius:6px}
+.ds-yellow{background:#fff4cc;color:#8a6500 !important;font-weight:900;border-radius:6px}
+.ds-green{background:#e7f6ec;color:#14733f !important;font-weight:900;border-radius:6px}
+.legend{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+.legend span{font-size:10px;padding:4px 7px;border-radius:999px;background:#252a31}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+.status-bar{padding:10px 16px;border-radius:8px;font-size:12px;font-weight:700;margin-bottom:12px;display:none}
+.status-bar.ok{background:#e7f6ec;color:#14733f;display:block}
+.status-bar.err{background:#fde8e7;color:#a51f1a;display:block}
+.period-badge{display:inline-block;background:#ee4d2d;color:#fff;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:800;margin-left:8px}
+.at-popup{position:absolute;z-index:9999;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;max-width:420px;width:90vw;max-height:50vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,0.5)}
+.at-popup h3{margin:0 0 10px;font-size:14px}
+.at-popup .at-list{font-size:12px;line-height:2;word-break:break-all}
+.at-popup .at-close{float:right;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
+.at-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.grid2,.grid3{grid-template-columns:1fr}}
+@media(max-width:650px){.cards{grid-template-columns:repeat(2,1fr)}.head{flex-direction:column;align-items:flex-start}}
+
+
+.multi-filter-note{font-size:9px;color:#ee4d2d;margin-top:4px;font-weight:700}
+select[multiple]{min-height:92px;padding:6px}
+select[multiple] option{padding:5px 7px;border-radius:5px}
+select[multiple] option:checked{background:#ee4d2d linear-gradient(0deg,#ee4d2d,#ee4d2d);color:#fff}
+</style>
+<style>
+.multi-dd{position:relative;width:100%}
+.dd-btn{width:100%;height:38px;padding:8px 10px;border:1px solid #343a44;border-radius:7px;background:#101317;color:#f5f7fa;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font:inherit}
+.dd-btn:hover,.multi-dd.open .dd-btn{border-color:#ee4d2d;box-shadow:0 0 0 2px rgba(238,77,45,.12)}
+.dd-btn b{color:#ee4d2d}
+.dd-menu{display:none;position:absolute;z-index:2000;top:calc(100% + 4px);left:0;width:100%;min-width:190px;background:#15181d;border:1px solid #343a44;border-radius:8px;box-shadow:0 12px 28px rgba(0,0,0,.5);overflow:hidden}
+.multi-dd.open .dd-menu{display:block}
+.dd-options{max-height:260px;overflow-y:auto;padding:5px}
+.dd-option{display:flex;align-items:center;gap:8px;padding:8px;border-radius:5px;color:#f5f7fa;cursor:pointer;font-size:13px}
+.dd-option:hover{background:#22272f}
+.dd-option input{width:15px;height:15px;accent-color:#ee4d2d}
+.dd-option.selected{background:rgba(238,77,45,.12)}
+.dd-empty{padding:10px;color:#9aa2ad;font-size:12px}
+.driver-search{display:flex;align-items:center;gap:7px;padding:7px;border-bottom:1px solid #2a2f37;background:#15181d}
+.driver-search input{width:100%;height:30px;padding:5px 7px;border:1px solid #343a44;border-radius:6px;background:#0f1216;color:#fff;outline:none}
+.driver-search input:focus{border-color:#ee4d2d}
+</style>
+<style>
+/* ── Light theme ── */
+[data-theme="light"]{--bg:#f4f6f8;--card:#fff;--text:#172033;--muted:#697386;--line:#e4e8ef;--shadow:0 6px 22px rgba(23,32,51,.07)}
+[data-theme="light"] body{background:var(--bg);color:var(--text)}
+[data-theme="light"] header{background:linear-gradient(135deg,#fff,#f7f8fa);color:#172033;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+[data-theme="light"] h1{color:#172033}
+[data-theme="light"] .subtitle{color:#697386}
+[data-theme="light"] button,[data-theme="light"] .fileLabel{background:#fff;color:#172033;border-color:#d9dee7}
+[data-theme="light"] button:hover,[data-theme="light"] .fileLabel:hover{background:#ee4d2d;color:#fff;border-color:#ee4d2d}
+[data-theme="light"] select,[data-theme="light"] input{background:#fff;color:#172033;border-color:#d9dee7}
+[data-theme="light"] .card,[data-theme="light"] .panel{background:#fff;border-color:#e4e8ef;box-shadow:0 4px 16px rgba(23,32,51,.06)}
+[data-theme="light"] th{background:#f7f8fa;color:#5f6878;border-color:#e4e8ef}
+[data-theme="light"] th[data-sort]:hover{background:#eef0f4}
+[data-theme="light"] td{border-color:#eef0f4}
+[data-theme="light"] tr:hover td{background:#fafbfc}
+[data-theme="light"] .dd-btn{background:#fff;color:#172033;border-color:#d9dee7}
+[data-theme="light"] .dd-menu{background:#fff;border-color:#d9dee7;box-shadow:0 8px 24px rgba(0,0,0,.1)}
+[data-theme="light"] .dd-option{color:#172033}
+[data-theme="light"] .dd-option:hover{background:#f0f2f5}
+[data-theme="light"] .driver-search{background:#fff;border-color:#e4e8ef}
+[data-theme="light"] .driver-search input{background:#f7f8fa;color:#172033;border-color:#d9dee7}
+[data-theme="light"] .legend span{background:#f0f2f5}
+[data-theme="light"] .period-badge{background:#ee4d2d;color:#fff}
+.drop-modal{position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:100;display:none;align-items:flex-start;justify-content:center;padding-top:80px}
+.drop-modal.open{display:flex}
+.drop-dialog{width:min(1180px,96vw);max-height:92vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.55);padding:22px}
+.drop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:16px}
+.drop-head h2{font-size:20px}.drop-head .sub{color:var(--muted);font-size:12px;margin-top:5px}
+.drop-close{font-size:22px;padding:5px 10px;border-radius:8px}
+.drop-hero{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}
+.drop-kpi{background:#101317;border:1px solid var(--line);border-radius:12px;padding:13px}
+[data-theme="light"] .drop-kpi{background:#f7f8fa}
+.drop-kpi .k{font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase}.drop-kpi .v{font-size:22px;font-weight:900;margin-top:5px}.drop-kpi .delta{font-size:11px;margin-top:4px;font-weight:800}
+.drop-section{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.drop-section h3{font-size:13px;margin-bottom:8px}.drop-section .desc{margin-bottom:8px}
+.drop-narrative{font-size:13px;line-height:1.65}.drop-narrative b{color:#ee4d2d}
+.drop-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.drop-table{width:100%;border-collapse:collapse;font-size:11px}.drop-table th{position:static;background:#1d2127;color:#ffb39f;padding:8px}.drop-table td{padding:8px;border-bottom:1px solid var(--line)}
+[data-theme="light"] .drop-table th{background:#f1f3f6;color:#5f6878}
+.drop-neg{color:var(--danger);font-weight:900}.drop-pos{color:var(--good);font-weight:900}
+.drop-empty{color:var(--muted);padding:12px 0;font-size:12px}
+@media(max-width:800px){.drop-hero{grid-template-columns:repeat(2,1fr)}.drop-grid{grid-template-columns:1fr}}
+</style>
+<style>
+body{contain:layout style}
+.chartbox{contain:layout paint}
+.panel,.card{contain:layout style}
+</style></head>
+<body>
+<header>
+ <div class="head">
+  <div><h1>🚚 Driver Performance — Control Tower <span style="color:#ee4d2d">●</span></h1><div class="subtitle">Análise operacional de DS D0, classificação, pendências e impacto no D+1 <span id="periodBadge"></span></div></div>
+  <div class="actions">
+   <button onclick="document.getElementById('fileInput').click()">📥 Carregar XLSX</button><input id="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none">
+   <button onclick="exportCSV()">📤 Exportar CSV</button>
+   <button id="dropSummaryBtn" onclick="openDropSummary()" disabled>🔎 Resumo da Queda</button>
+   <button onclick="resetFilters()">↺ Limpar filtros</button>
+   <button id="themeBtn" onclick="toggleTheme()" title="Alternar tema claro/escuro">🌙</button>
+  </div>
+ </div>
+</header>
+<main>
+<div id="statusBar" class="status-bar"></div>
+<section class="filters">
+ <div><label>Regional</label><div class="multi-dd" data-filter="fRegional"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar regional..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Operação</label><div class="multi-dd" data-filter="fStation"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar operação..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Data</label><div class="multi-dd" data-filter="fDate"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar data..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Driver ID</label><div class="multi-dd" data-filter="fDriverId"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar ID..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Drive</label><div class="multi-dd" data-filter="fDriver"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar drive..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>AT Number</label><div class="multi-dd" data-filter="fAT"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar AT..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Tipo Veículo</label><div class="multi-dd" data-filter="fVehicle"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar veículo..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Range Expedição</label><div class="multi-dd" data-filter="fRange"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar range..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Classificação</label><div class="multi-dd" data-filter="fClass"><button type="button" class="dd-btn"><span>Selecionar...</span><b>▾</b></button><div class="dd-menu"><div class="driver-search">🔎<input type="text" placeholder="Buscar classificação..." autocomplete="off"></div><div class="dd-options"></div></div></div></div>
+ <div><label>Busca rápida</label><input id="fSearch" placeholder="Drive / AT..."></div>
+</section>
+<section class="cards">
+ <div class="card"><div class="k">Drives</div><div class="v" id="cDrivers">0</div><div class="s">registros filtrados</div></div>
+ <div class="card"><div class="k">Total Expedido</div><div class="v" id="cTotal">0</div><div class="s">pacotes</div></div>
+ <div class="card"><div class="k">DS D0</div><div class="v" id="cDS">0%</div><div class="s">média ponderada</div></div>
+ <div class="card"><div class="k">DS D0 &lt; 95%</div><div class="v danger" id="cOffenders">0</div><div class="s">drives ofensores</div></div>
+ <div class="card"><div class="k">Delivering D0</div><div class="v" id="cDelivering">0</div><div class="s">pendência em rota</div></div>
+ <div class="card"><div class="k">Impacto D+1</div><div class="v danger" id="cD1">0</div><div class="s">Delivered D1 + Delivering D1 + On Hold D1</div></div>
+</section>
+
+<section class="panel" id="dsLinePanel" style="display:none">
+ <h2>📈 DS D0 diário — evolução no período</h2>
+ <div class="desc">Linha vermelha: DS D0 real. Linha verde tracejada: meta 95%.</div>
+ <div class="chartbox"><canvas id="dsLineChart"></canvas></div>
+</section>
+
+<section class="panel" id="recurrencePanel" style="display:none">
+ <h2 style="display:flex;justify-content:space-between;align-items:center">🔁 Recorrência de Ofensores por Drive <button onclick="exportRecurrence()" style="font-size:12px;padding:6px 14px">📥 Baixar recorrência</button></h2>
+ <div class="desc">Identifica se o Drive aparece como ofensor (DS D0 &lt; 95%) em mais de um dia da base carregada. <b>🔴 Recorrente</b> = ofensor em 2 ou mais dias | <b>🟡 Pontual</b> = ofensor em apenas 1 dia.</div>
+ <div class="tableWrap" style="max-height:520px"><table id="recurrenceTable"><thead><tr>
+  <th>#</th><th>Drive</th><th>Driver ID</th><th>Operação</th><th class="num">Dias analisados</th><th class="num">Dias como ofensor</th><th class="num">Recorrência</th><th class="num">DS médio</th><th class="num">Pior DS</th><th class="num">Pendência D0</th><th>Status</th>
+ </tr></thead><tbody id="recurrenceBody"></tbody></table></div>
+</section>
+
+<section class="panel" id="weeklyOffPanel" style="display:none">
+ <h2 style="display:flex;justify-content:space-between;align-items:center">🚨 Top ofensores do período (DS D0 &lt; 95%) <button onclick="exportOffenders()" style="font-size:12px;padding:6px 14px">📥 Baixar ofensores</button></h2>
+ <div class="desc">Ranking acumulado do <b>pior → melhor DS D0</b>. 🔴 0%–79,99% | 🟡 80%–94,99% | 🟢 95% ou acima. A barra empilhada mostra a composição da pendência.</div>
+ <div class="chartbox tall"><canvas id="weeklyOffChart"></canvas></div>
+</section>
+
+<section class="panel" id="stationPanel" style="display:none">
+ <h2>🏭 Resultado por Operação — DS D0 diário</h2>
+ <div class="desc">Classificação da pior para a melhor operação (DS D0 acumulado). Colunas mostram o DS D0 de cada dia. <b>🔴 0%–79,99%</b> | <b>🟡 80%–94,99%</b> | <b>🟢 ≥95%</b>.</div>
+ <div class="tableWrap" style="max-height:500px"><table class="compact" id="stationTable"><thead id="stationHead"></thead><tbody id="stationBody"></tbody></table></div>
+</section>
+
+<section class="panel" id="hubImpactPanel" style="display:none">
+ <h2>📉 Drives que mais impactaram o resultado do HUB</h2>
+ <div class="desc">Quanto cada drive ofensor puxou o DS D0 do HUB para baixo. "Impacto %" = pacotes não entregues pelo drive ÷ total expedido do HUB × 100. Ordenado do maior impacto para o menor.</div>
+ <div class="chartbox tall"><canvas id="hubImpactChart"></canvas></div>
+</section>
+
+<section class="grid2">
+ <div class="panel">
+  <h2>🚨 Drives que mais impactam o D0</h2>
+  <div class="desc">Ranking por pacotes no D1.</div>
+  <div class="chartbox"><canvas id="impactChart"></canvas></div>
+ </div>
+ <div class="panel">
+  <h2>📊 Distribuição por Classificação</h2>
+  <div class="desc">Pior → melhor.</div>
+  <div class="chartbox"><canvas id="classChart"></canvas></div>
+  <div class="legend"><span class="badge crit">Crítica</span><span class="badge low">Baixa</span><span class="badge reg">Regular</span><span class="badge good">Boa</span><span class="badge vgood">Muito Boa</span><span class="badge excel">Excelente</span></div>
+ </div>
+</section>
+<section class="grid3">
+ <div class="panel"><h2>DS D0 por Drive</h2><div class="desc">Abaixo de 95% = ofensor.</div><div class="chartbox small"><canvas id="dsChart"></canvas></div></div>
+ <div class="panel"><h2>Pendência D0</h2><div class="desc">Total expedido − Delivered D0.</div><div class="chartbox small"><canvas id="pendingChart"></canvas></div></div>
+ <div class="panel"><h2>Composição D+1</h2><div class="desc">Pacotes no dia seguinte.</div><div class="chartbox small"><canvas id="d1Chart"></canvas></div></div>
+</section>
+
+<section class="panel">
+ <h2>🔎 Ranking operacional dos Drives</h2>
+ <div class="desc">Prioriza impacto D+1, pendência D0 e DS D0.</div>
+ <div class="tableWrap"><table class="compact"><thead><tr>
+  <th>#</th><th>Drive</th><th>AT(s)</th><th>Classificação</th><th>Veículo</th><th>Range</th>
+  <th class="num">Expedido</th><th class="num">DS D0 %</th><th class="num">Delivering D0</th><th class="num">On Hold D0</th>
+  <th class="num">Pendência D0</th><th class="num">Delivered D1</th><th class="num">Delivering D1</th><th class="num">On Hold D1</th>
+  <th class="num">Impacto D+1</th><th class="num">Nota DS</th>
+ </tr></thead><tbody id="mainTable"></tbody></table></div>
+</section>
+<section class="panel">
+ <h2>📋 Registros Detalhados</h2>
+ <div class="desc">Base filtrada — consulta individual por AT.</div>
+ <div class="tableWrap" style="max-height:430px"><table><thead><tr id="detailHead">
+  <th data-sort="date">Data</th><th data-sort="at">AT</th><th data-sort="driver">Drive</th><th data-sort="vehicle">Veículo</th><th data-sort="range">Range</th><th data-sort="classification">Classificação</th>
+  <th class="num" data-sort="total">Expedido</th><th class="num" data-sort="dsD0">DS D0 %</th><th class="num" data-sort="dsD1">DS D1 %</th>
+  <th class="num" data-sort="deliveredD0">Delivered D0</th><th class="num" data-sort="deliveringD0">Delivering D0</th><th class="num" data-sort="onHoldD0">On Hold D0</th>
+  <th class="num" data-sort="onHoldD1">On Hold D1</th><th class="num" data-sort="deliveredD1">Delivered D1</th><th class="num" data-sort="deliveringD1">Delivering D1</th>
+  <th class="num" data-sort="notaDS">Nota DS</th>
+ </tr></thead><tbody id="detailTable"></tbody></table></div>
+</section>
+
+<div id="welcomeOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(23,27,38,0.6);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding-top:80px">
+ <div style="background:#15181d;border:1px solid #30353d;border-radius:18px;padding:48px 56px;max-width:520px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,0.2)">
+  <div style="font-size:56px;margin-bottom:16px">📊</div>
+  <h2 style="font-size:22px;margin:0 0 12px;color:#fff">Driver Performance — Control Tower</h2>
+  <p style="color:#a7adb8;font-size:14px;line-height:1.6;margin:0 0 24px">Clique no botão abaixo para carregar a base <b>.xlsx</b> com os dados de performance.<br>Suporta base de 1 dia ou semana inteira.</p>
+  <label style="display:inline-block;background:#ee4d2d;color:#fff;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer">
+   📂 Selecionar arquivo XLSX
+   <input id="welcomeFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none">
+  </label>
+  <p style="color:#a0a8b8;font-size:11px;margin-top:16px">Colunas: Dia Delivering, At Number, Driver Name, Tipo Veículo, Range Expedição, Classificação Nota, Total Delivery, DS DO (%), DS D1 (%), Delivered D0, Delivering D0, On Hold D0, On Hold D1, Delivered D1, Delivering D1, Nota DS</p>
+ </div>
+</div>
+</main>
+
+<div id="dropSummaryModal" class="drop-modal" onclick="if(event.target===this)closeDropSummary()">
+  <div class="drop-dialog">
+    <div class="drop-head">
+      <div><h2>🔎 Resumo da Queda de Resultado</h2><div id="dropSummaryPeriod" class="sub"></div></div>
+      <button class="drop-close" onclick="closeDropSummary()">✕</button>
+    </div>
+    <div id="dropSummaryContent"></div>
+  </div>
+</div>
+
+<script>
+
+var EMBEDDED = [];
+
+var ALIASES = {
+ "Dia Delivering":"date","Data":"date",
+ "Regional":"regional",
+ "At Number":"at","AT Number":"at","AT":"at",
+ "Driver Name":"driver","Drive":"driver","Motorista":"driver",
+ "Driver ID":"driverId","ID Driver":"driverId",
+ "Tipo Veículo":"vehicle","Tipo de Veículo":"vehicle","Tipo Veiculo":"vehicle","Veículo":"vehicle",
+ "Range Expedição":"range","Range de Expedição":"range","Range Expedicao":"range",
+ "Classificação Nota":"classification","Classificacao Nota":"classification","Classificação":"classification",
+ "Total Delivery":"total","Total Expedido":"total",
+ "DS DO (%)":"dsD0","DS D0":"dsD0","DS D0 (%)":"dsD0",
+ "DS D1 (%)":"dsD1","DS D1":"dsD1",
+ "Delivered D0":"deliveredD0","Delivering D0":"deliveringD0",
+ "On Hold D0":"onHoldD0","On Hold D1":"onHoldD1",
+ "Delivered D1":"deliveredD1","Delivering D1":"deliveringD1",
+ "Nota DS":"notaDS",
+ "Station Name":"station","Station":"station","Operação":"station"
+};
+var NUMERIC_FIELDS=["total","dsD0","dsD1","deliveredD0","deliveringD0","onHoldD0","onHoldD1","deliveredD1","deliveringD1","notaDS"];
+var CLASS_ORDER=["Crítica","Baixa","Regular","Boa","Muito Boa","Excelente"];
+var CLASS_RANK={};CLASS_ORDER.forEach(function(x,i){CLASS_RANK[x]=i;});
+var CLASS_COLOR=["#d92d20","#d9822b","#c9a800","#18864b","#0c7450","#2459a8"];
+
+function keyNorm(v){var s=String(v==null?"":v);s=s.normalize("NFD").replace(/[̀-ͯ]/g,"");return s.toLowerCase().replace(/[^a-z0-9]/g,"");}
+var aliasNorm={};Object.keys(ALIASES).forEach(function(k){aliasNorm[keyNorm(k)]=ALIASES[k];});
+
+function parseNum(v){
+  if(v===null||v===undefined||v==="")return 0;
+  if(typeof v==="number")return Number.isFinite(v)?v:0;
+  var x=String(v).trim().replace("%","").replace(/\s/g,"");
+  if(x.indexOf(",")>=0&&x.indexOf(".")>=0){if(x.lastIndexOf(",")>x.lastIndexOf("."))x=x.replace(/\./g,"").replace(",",".");else x=x.replace(/,/g,"");}
+  else if(x.indexOf(",")>=0)x=x.replace(",",".");
+  var n=Number(x);return Number.isFinite(n)?n:0;
+}
+function fmtDate(v){
+  if(!v)return "";if(v instanceof Date){var y=v.getFullYear(),m=String(v.getMonth()+1).padStart(2,"0"),d=String(v.getDate()).padStart(2,"0");return y+"-"+m+"-"+d;}
+  var s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+  var d2=new Date(s);if(!isNaN(d2.getTime()))return d2.getFullYear()+"-"+String(d2.getMonth()+1).padStart(2,"0")+"-"+String(d2.getDate()).padStart(2,"0");return s;
+}
+function normalizeRow(raw){
+  var o={};Object.keys(raw).forEach(function(k){var t=aliasNorm[keyNorm(k)];if(t)o[t]=raw[k];});
+  NUMERIC_FIELDS.forEach(function(k){o[k]=parseNum(o[k]);});
+  o.date=fmtDate(o.date);o.driver=String(o.driver==null?"":o.driver);o.driverId=String(o.driverId==null?"":o.driverId).replace(/\.0$/,"");o.at=String(o.at==null?"":o.at);
+  o.classification=String(o.classification==null?"":o.classification);o.vehicle=String(o.vehicle==null?"":o.vehicle);o.range=String(o.range==null?"":o.range);
+  o.station=String(o.station==null?"":o.station);
+  o.regional=String(o.regional==null?"":o.regional);
+  o.pendingD0=Math.max(0,o.total-o.deliveredD0);o.impactD1=o.deliveredD1+o.deliveringD1+o.onHoldD1;return o;
+}
+function initEmbedded(arr){return arr.map(function(r){NUMERIC_FIELDS.forEach(function(k){if(r[k]!==undefined)r[k]=parseNum(r[k]);});r.date=fmtDate(r.date);r.driver=String(r.driver==null?"":r.driver);r.driverId=String(r.driverId==null?"":r.driverId).replace(/\.0$/,"");r.at=String(r.at==null?"":r.at);r.classification=String(r.classification==null?"":r.classification);r.vehicle=String(r.vehicle==null?"":r.vehicle);r.range=String(r.range==null?"":r.range);r.station=String(r.station==null?"":r.station);r.regional=String(r.regional==null?"":r.regional);if(r.pendingD0===undefined)r.pendingD0=Math.max(0,r.total-r.deliveredD0);if(r.impactD1===undefined)r.impactD1=r.deliveredD1+r.deliveringD1+r.onHoldD1;return r;});}
+
+var data=initEmbedded(EMBEDDED);
+var charts={};
+var DETAIL_LIMIT=500;
+var renderTimer=null;
+
+function $(id){return document.getElementById(id);}
+function fmt(n){return new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0}).format(n||0);}
+function pct(n){return(n||0).toFixed(2).replace(".",",")+"%";}
+function esc(s){var map={"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"};return String(s==null?"":s).replace(/[&<>"']/g,function(m){return map[m];});}
+function badge(c){var cls={"Crítica":"crit","Baixa":"low","Regular":"reg","Boa":"good","Muito Boa":"vgood","Excelente":"excel"}[c]||"";return '<span class="badge '+cls+'">'+esc(c)+'</span>';}
+function driverLabel(r){return r.driverId?(r.driverId+" — "+r.driver):r.driver;}
+function dsClass(v){
+  return v < 80 ? "ds-red" : (v < 95 ? "ds-yellow" : "ds-green");
+}
+
+function unique(key){var seen=new Set();for(var i=0;i<data.length;i++){var v=data[i][key];if(v)seen.add(v);}return Array.from(seen).sort(function(a,b){return a.localeCompare(b,"pt-BR");});}
+var FILTER_MAP={fRegional:"regional",fStation:"station",fDate:"date",fDriverId:"driverId",fDriver:"driver",fAT:"at",fVehicle:"vehicle",fRange:"range",fClass:"classification"};
+function selectedValues(id){var dd=document.querySelector('.multi-dd[data-filter="'+id+'"]');if(!dd)return [];return Array.from(dd.querySelectorAll('input[type="checkbox"]:checked')).map(function(x){return x.value;});}
+function updateFilterLabel(id){var dd=document.querySelector('.multi-dd[data-filter="'+id+'"]');if(!dd)return;var vals=selectedValues(id);dd.querySelector('.dd-btn span').textContent=vals.length===0?"Selecionar...":(vals.length===1?vals[0]:vals.length+" selecionados");}
+function renderDropdown(id,vals,search){
+  var dd=document.querySelector('.multi-dd[data-filter="'+id+'"]');if(!dd)return;
+  dd._values=vals;
+  var old=new Set(selectedValues(id)), needle=(search||"").toLowerCase().trim(), box=dd.querySelector('.dd-options');
+  var filtered=vals.filter(function(v){return !needle||String(v).toLowerCase().indexOf(needle)>=0;});
+  /* Cap visible options at 300 to prevent DOM overload on large bases */
+  var MAX_VISIBLE=300;
+  var capped=filtered.length>MAX_VISIBLE;
+  var shown=capped?filtered.slice(0,MAX_VISIBLE):filtered;
+  if(!shown.length){box.innerHTML='<div class="dd-empty">Nenhuma opção encontrada</div>';return;}
+  /* Build HTML in one shot (much faster than createElement loop) */
+  var h="";
+  shown.forEach(function(v){
+    var checked=old.has(String(v));
+    h+='<label class="dd-option'+(checked?" selected":"")+'"><input type="checkbox" value="'+v.toString().replace(/"/g,"&quot;")+'"'+(checked?" checked":"")+"><span>"+v+"</span></label>";
+  });
+  if(capped) h+='<div class="dd-empty" style="color:#ee4d2d">Mostrando '+MAX_VISIBLE+' de '+filtered.length+'. Use a busca para refinar.</div>';
+  box.innerHTML=h;
+  /* Event delegation: single listener on box instead of one per checkbox */
+  box.onclick=function(ev){
+    var cb=ev.target.closest("input[type=checkbox]");if(!cb)return;
+    var lab=cb.closest(".dd-option");if(lab)lab.classList.toggle("selected",cb.checked);
+    updateFilterLabel(id);scheduleRender();
+  };
+}
+function fillDropdown(id,vals){renderDropdown(id,vals,"");updateFilterLabel(id);}
+function setupFilters(){
+  var sets={regional:new Set(),station:new Set(),date:new Set(),driverId:new Set(),driver:new Set(),at:new Set(),vehicle:new Set(),range:new Set(),classification:new Set()};
+  for(var i=0;i<data.length;i++){var r=data[i];if(r.regional)sets.regional.add(r.regional);if(r.station)sets.station.add(r.station);if(r.date)sets.date.add(r.date);if(r.driverId)sets.driverId.add(r.driverId);if(r.driver)sets.driver.add(r.driver);if(r.at)sets.at.add(r.at);if(r.vehicle)sets.vehicle.add(r.vehicle);if(r.range)sets.range.add(r.range);if(r.classification)sets.classification.add(r.classification);}
+  fillDropdown("fRegional",Array.from(sets.regional).sort(function(a,b){return a.localeCompare(b,"pt-BR");}));
+  fillDropdown("fStation",Array.from(sets.station).sort(function(a,b){return a.localeCompare(b,"pt-BR");}));
+  fillDropdown("fDate",Array.from(sets.date).sort());
+  fillDropdown("fDriverId",Array.from(sets.driverId).sort());
+  fillDropdown("fDriver",Array.from(sets.driver).sort(function(a,b){return a.localeCompare(b,"pt-BR");}));
+  fillDropdown("fAT",Array.from(sets.at).sort(function(a,b){return a.localeCompare(b,"pt-BR");}));
+  fillDropdown("fVehicle",Array.from(sets.vehicle).sort(function(a,b){return a.localeCompare(b,"pt-BR");}));
+  fillDropdown("fRange",Array.from(sets.range).sort(function(a,b){return a.localeCompare(b,"pt-BR");}));
+  fillDropdown("fClass",CLASS_ORDER.filter(function(x){return sets.classification.has(x);}));
+}
+function matchesSelected(value,vals){return vals.length===0||vals.indexOf(value)>=0;}
+function getFiltered(){
+  var fReg=new Set(selectedValues("fRegional")),fS=new Set(selectedValues("fStation")), fD=new Set(selectedValues("fDate")),
+      fDI=new Set(selectedValues("fDriverId")),
+      fDr=new Set(selectedValues("fDriver")), fA=new Set(selectedValues("fAT")),
+      fV=new Set(selectedValues("fVehicle")), fR=new Set(selectedValues("fRange")),
+      fC=new Set(selectedValues("fClass")), q=$("fSearch").value.trim().toLowerCase();
+  var hasQ=!!q, result=[], n=data.length;
+  for(var i=0;i<n;i++){
+    var r=data[i];
+    if(fReg.size && !fReg.has(r.regional))continue;
+    if(fS.size && !fS.has(r.station))continue;
+    if(fD.size && !fD.has(r.date))continue;
+    if(fDI.size && !fDI.has(r.driverId))continue;
+    if(fDr.size && !fDr.has(r.driver))continue;
+    if(fA.size && !fA.has(r.at))continue;
+    if(fV.size && !fV.has(r.vehicle))continue;
+    if(fR.size && !fR.has(r.range))continue;
+    if(fC.size && !fC.has(r.classification))continue;
+    if(hasQ){
+      var hay=(String(r.driverId||"")+" "+String(r.driver||"")+" "+String(r.at||"")+" "+String(r.vehicle||"")+" "+String(r.station||"")+" "+String(r.regional||"")).toLowerCase();
+      if(hay.indexOf(q)<0)continue;
+    }
+    result.push(r);
+  }
+  return result;
+}
+function initMultiDropdowns(){
+  document.querySelectorAll(".multi-dd").forEach(function(dd){
+    var btn=dd.querySelector(".dd-btn"),id=dd.getAttribute("data-filter");
+    btn.addEventListener("click",function(e){e.stopPropagation();document.querySelectorAll(".multi-dd.open").forEach(function(x){if(x!==dd)x.classList.remove("open");});dd.classList.toggle("open");});
+    dd.querySelector(".dd-menu").addEventListener("click",function(e){e.stopPropagation();});
+    var search=dd.querySelector(".driver-search input");
+    if(search)search.addEventListener("input",function(){renderDropdown(id,dd._values||[],search.value);});
+  });
+  document.addEventListener("click",function(){document.querySelectorAll(".multi-dd.open").forEach(function(x){x.classList.remove("open");});});
+}
+function clearSelect(id){var dd=document.querySelector('.multi-dd[data-filter="'+id+'"]');if(!dd)return;dd.querySelectorAll('input[type="checkbox"]').forEach(function(c){c.checked=false;});dd.querySelectorAll(".dd-option").forEach(function(o){o.classList.remove("selected");});updateFilterLabel(id);}
+function resetFilters(){Object.keys(FILTER_MAP).forEach(clearSelect);$("fSearch").value="";document.querySelectorAll(".driver-search input").forEach(function(x){x.value="";});Object.keys(FILTER_MAP).forEach(function(id){var dd=document.querySelector('.multi-dd[data-filter="'+id+'"]');if(dd)renderDropdown(id,dd._values||[],"");});scheduleRender();}
+function aggregate(rows){
+  var map=new Map(), n=rows.length;
+  for(var i=0;i<n;i++){
+    var r=rows[i], k=r.driver||"(Sem nome)", a=map.get(k);
+    if(!a){
+      a={driver:k,driverId:r.driverId||"",ats:{},stations:{},classification:r.classification,vehicle:r.vehicle,range:r.range,total:0,
+      deliveredD0:0,deliveringD0:0,onHoldD0:0,deliveredD1:0,deliveringD1:0,onHoldD1:0,
+      notaDS:0,n:0,dates:{}};
+      map.set(k,a);
+    }
+    a.ats[r.at]=1; a.dates[r.date]=1; if(r.station)a.stations[r.station]=1;
+    a.total+=r.total; a.deliveredD0+=r.deliveredD0; a.deliveringD0+=r.deliveringD0; a.onHoldD0+=r.onHoldD0;
+    a.deliveredD1+=r.deliveredD1; a.deliveringD1+=r.deliveringD1; a.onHoldD1+=r.onHoldD1;
+    a.notaDS+=r.notaDS; a.n++;
+    if((CLASS_RANK[r.classification]||99)>(CLASS_RANK[a.classification]||99))a.classification=r.classification;
+  }
+  var result=Array.from(map.values());
+  for(var j=0;j<result.length;j++){
+    var x=result[j];
+    x.atsList=Object.keys(x.ats).filter(Boolean);
+    x.stationsList=Object.keys(x.stations).filter(Boolean);
+    x.datesList=Object.keys(x.dates).sort();
+    x.dsD0=x.total?x.deliveredD0/x.total*100:0;
+    x.pendingD0=Math.max(0,x.total-x.deliveredD0);
+    x.impactD1=x.deliveredD1+x.deliveringD1+x.onHoldD1;
+    x.notaDS=x.n?x.notaDS/x.n:0;
+  }
+  return result;
+}
+
+/* ── Chart.js datalabels plugin (inline registration) ── */
+var datalabelsPlugin = {
+  id:"customDL",
+  afterDatasetsDraw:function(chart){
+    var ctx=chart.ctx;
+    var isLine=chart.config.type==="line";
+    var isDoughnut=chart.config.type==="doughnut"||chart.config.type==="pie";
+    if(isDoughnut)return; /* skip doughnut — use native legend instead */
+    chart.data.datasets.forEach(function(ds,di){
+      var meta=chart.getDatasetMeta(di);
+      if(meta.hidden)return;
+      /* skip the "Meta 95%" dataset on line charts (no labels for dashed line) */
+      if(isLine && ds.borderDash && ds.borderDash.length)return;
+      meta.data.forEach(function(el,idx){
+        var val=ds.data[idx];
+        if(val===0||val===null||val===undefined)return;
+        ctx.save();
+        if(isLine){
+          /* line chart: label above point, adapts to theme */
+          ctx.font="bold 12px Inter,Arial,sans-serif";
+          ctx.fillStyle=document.documentElement.getAttribute("data-theme")==="light"?"#172033":"#fff";
+          ctx.textAlign="center";
+          ctx.textBaseline="bottom";
+          ctx.fillText(val.toFixed(2).replace(".",",")+"%", el.x, el.y-8);
+        } else {
+          ctx.font="bold 11px Inter,Arial,sans-serif";
+          ctx.fillStyle="#fff";
+          ctx.textBaseline="middle";
+          if(chart.options.indexAxis==="y"){
+            /* horizontal bar */
+            var xPos=el.x-6;var yPos=el.y;
+            ctx.textAlign="right";
+            var barW=el.x-el.base;
+            if(barW<35){ctx.fillStyle="#555";ctx.textAlign="left";xPos=el.x+4;}
+            var label=typeof val==="number"&&val<100&&val!==Math.floor(val)?val.toFixed(2).replace(".",",")+"%":fmt(val);
+            ctx.fillText(label,xPos,yPos);
+          } else {
+            /* vertical bar */
+            var xPos2=el.x;var yPos2=el.y+14;
+            ctx.textAlign="center";
+            var barH=el.base-el.y;
+            if(barH<22){ctx.fillStyle="#555";yPos2=el.y-6;}
+            ctx.fillText(String(val),xPos2,yPos2);
+          }
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+Chart.register(datalabelsPlugin);
+
+function destroy(name){if(charts[name]){charts[name].destroy();charts[name]=null;}}
+
+function buildDriverRecurrence(rows){
+  var dates=Array.from(new Set(rows.map(function(r){return r.date;}).filter(Boolean))).sort();
+  var panel=$("recurrencePanel"),body=$("recurrenceBody");
+  if(dates.length<2){panel.style.display="none";body.innerHTML="";window._lastRecurrence=[];return;}
+  var m=new Map();
+  rows.forEach(function(r){
+    var key=r.driverId?"ID:"+r.driverId:"DR:"+(r.driver||"(Sem nome)");
+    if(!m.has(key))m.set(key,{driver:r.driver||"(Sem nome)",driverId:r.driverId||"",stations:{},days:{},offenderDays:{},dsSum:0,dsN:0,worst:101,pending:0});
+    var x=m.get(key), d=r.date;
+    if(d){x.days[d]=1;if(r.dsD0<95)x.offenderDays[d]=1;}
+    if(r.station)x.stations[r.station]=1;
+    x.dsSum+=r.dsD0||0;x.dsN++;
+    if((r.dsD0||0)<x.worst)x.worst=r.dsD0||0;
+    x.pending+=r.pendingD0||0;
+  });
+  var arr=Array.from(m.values()).map(function(x){
+    x.daysCount=Object.keys(x.days).length;
+    x.offDays=Object.keys(x.offenderDays).length;
+    x.recurrence=x.daysCount?x.offDays/x.daysCount*100:0;
+    x.avg=x.dsN?x.dsSum/x.dsN:0;
+    x.status=x.offDays>=2?"Recorrente":(x.offDays===1?"Pontual":"Não ofensor");
+    x.stationsList=Object.keys(x.stations);
+    return x;
+  });
+  /* Ofensores recorrentes primeiro, depois pontuais, e por maior quantidade de dias ofensores. */
+  arr.sort(function(a,b){
+    return (b.offDays-a.offDays)||(a.worst-b.worst)||(b.pending-a.pending)||a.driver.localeCompare(b.driver,"pt-BR");
+  });
+  window._lastRecurrence=arr;
+  var h="";
+  arr.forEach(function(x,i){
+    var status=x.status==="Recorrente"?'<span class="badge crit">🔴 Recorrente</span>':x.status==="Pontual"?'<span class="badge low">🟡 Pontual</span>':'<span class="badge good">🟢 Não ofensor</span>';
+    h+='<tr><td><b>'+(i+1)+'</b></td><td><b>'+esc(x.driver)+'</b></td><td>'+esc(x.driverId||"—")+'</td><td>'+esc(x.stationsList.join(", ")||"N/A")+'</td>';
+    h+='<td class="num">'+x.daysCount+'</td><td class="num"><b>'+x.offDays+'</b></td><td class="num">'+x.recurrence.toFixed(1).replace(".",",")+'%</td>';
+    h+='<td class="num '+dsClass(x.avg)+'">'+pct(x.avg)+'</td><td class="num '+dsClass(x.worst)+'">'+pct(x.worst)+'</td><td class="num danger">'+fmt(x.pending)+'</td><td>'+status+'</td></tr>';
+  });
+  body.innerHTML=h||'<tr><td colspan="11" class="empty">Nenhum registro encontrado.</td></tr>';
+  panel.style.display="";
+}
+
+function makeCharts(rows,ag){
+  /* 1. Impact D+1 */
+  var topImp=ag.slice().sort(function(a,b){return(b.impactD1-a.impactD1)||(b.pendingD0-a.pendingD0);}).slice(0,15);
+  destroy("impact");
+  charts.impact=new Chart($("impactChart"),{type:"bar",data:{
+    labels:topImp.map(function(x){var lbl=driverLabel(x);return lbl.length>30?lbl.slice(0,30)+"…":lbl;}),
+    datasets:[{label:"Impacto D+1",data:topImp.map(function(x){return x.impactD1;}),backgroundColor:"#ee4d2d"}]
+  },options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{
+    afterBody:function(items){
+      var idx=items[0].dataIndex,d=topImp[idx];
+      return "HUB: "+(d.stationsList.join(", ")||"N/A")+"\nDS D0: "+d.dsD0.toFixed(2).replace(".",",")+"%\nClassificação: "+d.classification;
+    }
+  }}},scales:{x:{beginAtZero:true},y:{ticks:{autoSkip:false,font:{size:10}}}}}});
+
+  /* 2. Classification */
+  var cls=CLASS_ORDER.map(function(c){return ag.filter(function(x){return x.classification===c;}).length;});
+  destroy("class");
+  charts["class"]=new Chart($("classChart"),{type:"bar",data:{
+    labels:CLASS_ORDER,datasets:[{label:"Drives",data:cls,backgroundColor:CLASS_COLOR}]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+
+  /* 3. DS D0 offenders */
+  var ds=ag.filter(function(x){return x.dsD0<95;}).sort(function(a,b){return a.dsD0-b.dsD0;}).slice(0,15);
+  destroy("ds");
+  charts.ds=new Chart($("dsChart"),{type:"bar",data:{
+    labels:ds.map(function(x){var lbl=driverLabel(x);return lbl.length>26?lbl.slice(0,26)+"…":lbl;}),
+    datasets:[{label:"DS D0 %",data:ds.map(function(x){return x.dsD0;}),backgroundColor:ds.map(function(x){return x.dsD0<80?"#d92d20":x.dsD0<90?"#d9822b":"#c9a800";})}]
+  },options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,scales:{x:{min:0,max:100},y:{ticks:{autoSkip:false,font:{size:10}}}},plugins:{legend:{display:false}}}});
+
+  /* 4. Pending D0 */
+  var pend=ag.slice().sort(function(a,b){return b.pendingD0-a.pendingD0;}).slice(0,15);
+  destroy("pending");
+  charts.pending=new Chart($("pendingChart"),{type:"bar",data:{
+    labels:pend.map(function(x){var lbl=driverLabel(x);return lbl.length>26?lbl.slice(0,26)+"…":lbl;}),
+    datasets:[{label:"Pendência D0",data:pend.map(function(x){return x.pendingD0;}),backgroundColor:"#3867d6"}]
+  },options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{ticks:{autoSkip:false,font:{size:10}}}}}});
+
+  /* 5. D1 composition */
+  var d1v=[0,0,0];rows.forEach(function(r){d1v[0]+=r.deliveredD1;d1v[1]+=r.deliveringD1;d1v[2]+=r.onHoldD1;});
+  destroy("d1");
+  if(d1v[0]+d1v[1]+d1v[2]>0){
+    charts.d1=new Chart($("d1Chart"),{type:"doughnut",data:{labels:["Delivered D1","Delivering D1","On Hold D1"],datasets:[{data:d1v,backgroundColor:["#18864b","#d9822b","#d92d20"]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:"bottom",labels:{padding:12,usePointStyle:true,font:{size:11,weight:"bold"}}}}}});
+  }else{
+    charts.d1=new Chart($("d1Chart"),{type:"doughnut",data:{labels:["Sem dados D1"],datasets:[{data:[1],backgroundColor:["#e4e8ef"]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:"bottom"},tooltip:{enabled:false}}}});
+  }
+
+  /* 6. Weekly: DS D0 by day (line) */
+  var dates=unique("date");
+  if(dates.length>1){
+    var dsPerDay=dates.map(function(dt){
+      var dayRows=rows.filter(function(r){return r.date===dt;});
+      var tT=0,tD=0;dayRows.forEach(function(r){tT+=r.total;tD+=r.deliveredD0;});
+      return tT?tD/tT*100:0;
+    });
+    destroy("dsLine");
+    charts.dsLine=new Chart($("dsLineChart"),{type:"line",data:{
+      labels:dates.map(function(d){return d.slice(5);}),
+      datasets:[{label:"DS D0 %",data:dsPerDay,borderColor:"#ee4d2d",backgroundColor:"rgba(238,77,45,0.1)",fill:true,tension:0.3,pointRadius:5,pointBackgroundColor:"#ee4d2d"},
+                {label:"Meta 95%",data:dates.map(function(){return 95;}),borderColor:"#18864b",borderDash:[6,4],pointRadius:0,fill:false}]
+    },options:{responsive:true,maintainAspectRatio:false,scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+"%";}}}},
+      plugins:{legend:{position:"bottom",labels:{color:document.documentElement.getAttribute("data-theme")==="light"?"#172033":"#fff"}}}}});
+    $("dsLinePanel").style.display="";
+  } else {
+    $("dsLinePanel").style.display="none";
+  }
+
+  /* 7. Weekly: top offenders across all days — pior → melhor */
+  var offenders=ag.filter(function(x){return x.dsD0<95;})
+    .sort(function(a,b){return a.dsD0-b.dsD0;}).slice(0,20);
+  window._lastOffenders=offenders; /* store for export */
+  destroy("weeklyOff");
+  if(offenders.length>0){
+    var offenderColors=offenders.map(function(x){
+      return x.dsD0<80?"#d92d20":(x.dsD0<95?"#d9822b":"#18864b");
+    });
+    charts.weeklyOff=new Chart($("weeklyOffChart"),{type:"bar",data:{
+      labels:offenders.map(function(x){
+        return (driverLabel(x).length>28?driverLabel(x).slice(0,28)+"…":driverLabel(x))+" — "+x.dsD0.toFixed(2).replace(".",",")+"%";
+      }),
+      datasets:[
+        {label:"Pendência D0",data:offenders.map(function(x){return x.pendingD0;}),backgroundColor:offenderColors},
+        {label:"Delivering D0",data:offenders.map(function(x){return x.deliveringD0;}),backgroundColor:"#d9822b"},
+        {label:"On Hold D0",data:offenders.map(function(x){return x.onHoldD0;}),backgroundColor:"#c9a800"}
+      ]
+    },options:{
+      indexAxis:"y",responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:"bottom"},
+        tooltip:{callbacks:{
+          title:function(items){return items[0].label;},
+          afterBody:function(items){
+            var i=items[0].dataIndex, d=offenders[i];
+            var ds=d.dsD0;
+            return "HUB: "+(d.stationsList.join(", ")||"N/A")+"\nClassificação: "+(ds<80?"🔴 Crítico — 0% a 79,99%":ds<95?"🟡 Atenção — 80% a 94,99%":"🟢 Meta — 95% ou acima");
+          }
+        }}
+      },
+      scales:{
+        x:{stacked:true,beginAtZero:true},
+        y:{stacked:true,ticks:{autoSkip:false,font:{size:11},padding:4}}
+      }
+    }});
+    $("weeklyOffPanel").style.display="";
+  } else {
+    $("weeklyOffPanel").style.display="none";
+  }
+
+  /* 8. Hub impact: aggregate all filtered drivers independently of the top-offenders chart.
+     This keeps the HUB chart reliable on large bases and avoids depending on a separately
+     truncated/filtered list. */
+  var hubTotal=0;
+  for(var hi=0;hi<rows.length;hi++) hubTotal+=Number(rows[hi].total)||0;
+
+  var impactData=[];
+  if(hubTotal>0){
+    impactData=ag.map(function(d){
+      var total=Number(d.total)||0;
+      var delivered=Number(d.deliveredD0)||0;
+      var failed=Math.max(0,total-delivered);
+      var impactPct=failed/hubTotal*100;
+      return {driver:d.driver||"(Sem nome)",driverId:d.driverId||"",
+              station:d.stationsList?d.stationsList.join(", "):"",
+              dsD0:Number(d.dsD0)||0,total:total,failed:failed,impactPct:impactPct};
+    }).filter(function(x){return x.failed>0 && Number.isFinite(x.impactPct);})
+      .sort(function(a,b){return b.impactPct-a.impactPct;})
+      .slice(0,20);
+  }
+
+  destroy("hubImpact");
+  if(hubTotal>0 && impactData.length>0){
+    $("hubImpactPanel").style.display="";
+    charts.hubImpact=new Chart($("hubImpactChart"),{type:"bar",data:{
+      labels:impactData.map(function(x){
+        var lbl=x.driverId?(x.driverId+" — "):"";
+        lbl+=x.driver.length>18?x.driver.slice(0,18)+"…":x.driver;
+        return lbl;
+      }),
+      datasets:[{
+        label:"Impacto no DS D0 do HUB (%)",
+        data:impactData.map(function(x){return Number(x.impactPct.toFixed(4));}),
+        backgroundColor:impactData.map(function(x){return x.impactPct>=2?"#d92d20":x.impactPct>=1?"#d9822b":"#c9a800";}),
+        borderWidth:0,
+        minBarLength:3,
+        barPercentage:0.8,
+        categoryPercentage:0.9
+      }]
+    },options:{
+      indexAxis:"y",responsive:true,maintainAspectRatio:false,
+      animation:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          afterBody:function(items){
+            var idx=items[0].dataIndex,d=impactData[idx];
+            return "HUB: "+(d.station||"N/A")+"\\nDS D0 do drive: "+d.dsD0.toFixed(2).replace(".",",")+"%\\nPacotes expedidos: "+fmt(d.total)+"\\nPacotes não entregues D0: "+fmt(d.failed)+"\\nImpacto no HUB: "+d.impactPct.toFixed(2).replace(".",",")+"%";
+          }
+        }}
+      },
+      scales:{
+        x:{type:"linear",beginAtZero:true,grace:"8%",title:{display:true,text:"Impacto no DS D0 do HUB (%)"}},
+        y:{type:"category",offset:true,ticks:{autoSkip:false,font:{size:11},padding:4}}
+      }
+    }});
+  } else {
+    $("hubImpactPanel").style.display="none";
+  }
+}
+
+function buildStationTable(rows){
+  var dates=[];var dateSet={};
+  rows.forEach(function(r){if(r.date&&!dateSet[r.date]){dateSet[r.date]=1;dates.push(r.date);}});
+  dates.sort();
+  if(dates.length<1||!rows.some(function(r){return r.station;})){$("stationPanel").style.display="none";return;}
+  $("stationPanel").style.display="";
+
+  /* Aggregate by station */
+  var stMap={};
+  rows.forEach(function(r){
+    var st=r.station||"(Sem operação)";
+    if(!stMap[st])stMap[st]={station:st,total:0,deliveredD0:0,byDay:{}};
+    var s=stMap[st];s.total+=r.total;s.deliveredD0+=r.deliveredD0;
+    if(!s.byDay[r.date])s.byDay[r.date]={total:0,deliveredD0:0};
+    s.byDay[r.date].total+=r.total;s.byDay[r.date].deliveredD0+=r.deliveredD0;
+  });
+
+  var stations=Object.keys(stMap).map(function(k){
+    var s=stMap[k];s.dsD0=s.total?s.deliveredD0/s.total*100:0;return s;
+  });
+  /* Sort worst to best */
+  stations.sort(function(a,b){return a.dsD0-b.dsD0;});
+
+  /* Build header */
+  var hH='<tr><th>#</th><th>Operação</th><th class="num">Expedido</th><th class="num">DS D0 Geral</th>';
+  dates.forEach(function(d){hH+='<th class="num">'+d.slice(5)+'</th>';});
+  hH+='</tr>';
+  $("stationHead").innerHTML=hH;
+
+  /* Build body */
+  var bH="";
+  stations.forEach(function(s,i){
+    bH+='<tr><td><b>'+(i+1)+'</b></td><td><b>'+esc(s.station)+'</b></td>';
+    bH+='<td class="num">'+fmt(s.total)+'</td>';
+    bH+='<td class="num '+dsClass(s.dsD0)+'">'+s.dsD0.toFixed(2).replace(".",",")+' %</td>';
+    dates.forEach(function(d){
+      var day=s.byDay[d];
+      if(day&&day.total>0){
+        var dayDs=day.deliveredD0/day.total*100;
+        bH+='<td class="num '+dsClass(dayDs)+'">'+dayDs.toFixed(2).replace(".",",")+' %</td>';
+      }else{
+        bH+='<td class="num" style="color:#bbb">—</td>';
+      }
+    });
+    bH+='</tr>';
+  });
+  $("stationBody").innerHTML=bH;
+}
+
+function render(){
+  var rows=getFiltered(),ag=aggregate(rows);
+  $("cDrivers").textContent=fmt(ag.length);
+  var tTotal=0,tDel=0;rows.forEach(function(r){tTotal+=r.total;tDel+=r.deliveredD0;});
+  $("cTotal").textContent=fmt(tTotal);
+  var dsVal=tTotal?tDel/tTotal*100:0;
+  $("cDS").textContent=pct(dsVal);$("cDS").parentElement.style.color=dsVal<95?"var(--danger)":"";
+  $("cOffenders").textContent=fmt(ag.filter(function(x){return x.dsD0<95;}).length);
+  var tDlv=0;rows.forEach(function(r){tDlv+=r.deliveringD0;});$("cDelivering").textContent=fmt(tDlv);
+  var tImp=0;rows.forEach(function(r){tImp+=r.impactD1;});$("cD1").textContent=fmt(tImp);
+
+  /* Period badge */
+  var dates=unique("date");
+  var dropBtn=$("dropSummaryBtn");
+  if(dropBtn){dropBtn.disabled=dates.length<2;dropBtn.title=dates.length<2?"Carregue pelo menos 2 dias para comparar":"Comparar os dois últimos dias selecionados";}
+  var pb=$("periodBadge");
+  if(pb){
+    if(dates.length>1) pb.innerHTML='<span class="period-badge">'+dates[0].slice(5)+' a '+dates[dates.length-1].slice(5)+' ('+dates.length+' dias)</span>';
+    else if(dates.length===1) pb.innerHTML='<span class="period-badge">'+dates[0]+'</span>';
+    else pb.innerHTML="";
+  }
+
+  makeCharts(rows,ag);
+  buildStationTable(rows);
+  buildDriverRecurrence(rows);
+
+  var sorted=ag.slice().sort(function(a,b){return(b.impactD1-a.impactD1)||(b.pendingD0-a.pendingD0)||(a.dsD0-b.dsD0)||((CLASS_RANK[a.classification]||99)-(CLASS_RANK[b.classification]||99));});
+  window._rankingSorted=sorted;
+  var mainH="";
+  sorted.forEach(function(r,i){
+    var atCount=r.atsList.length;
+    var atCell=atCount>0?'<span style="cursor:pointer;text-decoration:underline;color:var(--accent)" onclick="showATsPopup(this,'+i+')" title="Clique para ver as ATs">'+atCount+' AT'+(atCount>1?"s":"")+'</span>':'0';
+    mainH+='<tr><td><b>'+(i+1)+'</b></td><td><b>'+esc(driverLabel(r))+'</b></td><td>'+atCell+'</td><td>'+badge(r.classification)+'</td><td>'+esc(r.vehicle)+'</td><td>'+esc(r.range)+'</td>';
+    mainH+='<td class="num">'+fmt(r.total)+'</td><td class="num '+(r.dsD0<95?"danger":"success")+'">'+pct(r.dsD0)+'</td>';
+    mainH+='<td class="num">'+fmt(r.deliveringD0)+'</td><td class="num">'+fmt(r.onHoldD0)+'</td><td class="num danger">'+fmt(r.pendingD0)+'</td>';
+    mainH+='<td class="num">'+fmt(r.deliveredD1)+'</td><td class="num">'+fmt(r.deliveringD1)+'</td><td class="num">'+fmt(r.onHoldD1)+'</td>';
+    mainH+='<td class="num danger">'+fmt(r.impactD1)+'</td><td class="num" style="font-weight:900">'+r.notaDS.toFixed(2).replace(".",",")+'</td></tr>';
+  });
+  $("mainTable").innerHTML=mainH||'<tr><td colspan="16" class="empty">Nenhum registro encontrado.</td></tr>';
+
+  var detH="";
+  /* Apply sort if active */
+  var detRows=_detailSort.key?sortDetailRows(rows,_detailSort.key,_detailSort.asc):rows;
+  var detailCount=Math.min(detRows.length,DETAIL_LIMIT);
+  for(var di=0;di<detailCount;di++){
+    var r=detRows[di];
+    detH+='<tr><td>'+esc(r.date)+'</td><td>'+esc(r.at)+'</td><td><b>'+esc(driverLabel(r))+'</b></td><td>'+esc(r.vehicle)+'</td><td>'+esc(r.range)+'</td><td>'+badge(r.classification)+'</td>';
+    detH+='<td class="num">'+fmt(r.total)+'</td><td class="num '+(r.dsD0<95?"danger":"success")+'">'+pct(r.dsD0)+'</td>';
+    detH+='<td class="num">'+pct(r.dsD1)+'</td><td class="num">'+fmt(r.deliveredD0)+'</td><td class="num">'+fmt(r.deliveringD0)+'</td><td class="num">'+fmt(r.onHoldD0)+'</td>';
+    detH+='<td class="num">'+fmt(r.onHoldD1)+'</td><td class="num">'+fmt(r.deliveredD1)+'</td><td class="num">'+fmt(r.deliveringD1)+'</td>';
+    detH+='<td class="num" style="font-weight:900">'+parseNum(r.notaDS).toFixed(2).replace(".",",")+'</td></tr>';
+  }
+  if(!detH)detH='<tr><td colspan="16" class="empty">Nenhum registro encontrado.</td></tr>';
+  else if(detRows.length>DETAIL_LIMIT)detH+='<tr><td colspan="16" class="empty">Mostrando '+fmt(DETAIL_LIMIT)+' de '+fmt(detRows.length)+' registros filtrados. O restante continua sendo considerado nos indicadores e gráficos.</td></tr>';
+  $("detailTable").innerHTML=detH;
+}
+
+function showStatus(msg,isErr){var b=$("statusBar");b.textContent=msg;b.className="status-bar "+(isErr?"err":"ok");if(!isErr)setTimeout(function(){b.style.display="none";},8000);}
+function clearSelect(id){var el=$(id);if(!el)return;Array.from(el.options).forEach(function(o){o.selected=false;});}
+function resetFilters(){["fRegional","fStation","fDate","fDriverId","fDriver","fAT","fVehicle","fRange","fClass"].forEach(clearSelect);$("fSearch").value="";render();}
+var renderQueued=false;
+function scheduleRender(){
+  if(renderQueued)return;
+  renderQueued=true;
+  requestAnimationFrame(function(){
+    renderQueued=false;
+    if(typeof render==='function')render();
+    else if(typeof updateDashboard==='function')updateDashboard();
+    else if(typeof refresh==='function')refresh();
+  });
+}
+["fRegional","fStation","fDate","fDriverId","fDriver","fAT","fVehicle","fRange","fClass"].forEach(function(id){
+  var el=$(id);if(el)el.addEventListener("change",scheduleRender);
+});
+$("fSearch").addEventListener("input",scheduleRender);
+/* Multiselect: Ctrl+A seleciona todas as opções do filtro ativo */
+["fRegional","fStation","fDate","fDriverId","fDriver","fAT","fVehicle","fRange","fClass"].forEach(function(id){
+  var el=$(id);
+  if(el) el.addEventListener("keydown",function(e){
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="a"){
+      e.preventDefault();
+      Array.from(el.options).forEach(function(o){o.selected=true;});
+      scheduleRender();
+    }
+  });
+});
+
+
+
+/* ── Resumo automático da queda entre dois dias ── */
+function sumRows(rows){
+  var x={total:0,deliveredD0:0,deliveringD0:0,onHoldD0:0,deliveredD1:0,deliveringD1:0,onHoldD1:0};
+  rows.forEach(function(r){
+    x.total+=r.total||0;x.deliveredD0+=r.deliveredD0||0;x.deliveringD0+=r.deliveringD0||0;
+    x.onHoldD0+=r.onHoldD0||0;x.deliveredD1+=r.deliveredD1||0;x.deliveringD1+=r.deliveringD1||0;x.onHoldD1+=r.onHoldD1||0;
+  });
+  x.pendingD0=Math.max(0,x.total-x.deliveredD0);x.ds=x.total?x.deliveredD0/x.total*100:0;
+  x.impactD1=x.deliveredD1+x.deliveringD1+x.onHoldD1;return x;
+}
+function signedPct(v){return (v>0?"+":"")+v.toFixed(2).replace(".",",")+"%";}
+function dropGroupBy(rows,key){
+  var m={};
+  rows.forEach(function(r){
+    var k=String(r[key]||"(Sem "+key+")");
+    if(!m[k])m[k]={name:k,total:0,deliveredD0:0,deliveringD0:0,onHoldD0:0,deliveredD1:0,deliveringD1:0,onHoldD1:0,stations:{}};
+    var x=m[k];x.total+=r.total||0;x.deliveredD0+=r.deliveredD0||0;x.deliveringD0+=r.deliveringD0||0;
+    x.onHoldD0+=r.onHoldD0||0;x.deliveredD1+=r.deliveredD1||0;x.deliveringD1+=r.deliveringD1||0;x.onHoldD1+=r.onHoldD1||0;
+    if(r.station)x.stations[r.station]=1;
+  });
+  return Object.keys(m).map(function(k){
+    var x=m[k];x.pendingD0=Math.max(0,x.total-x.deliveredD0);x.ds=x.total?x.deliveredD0/x.total*100:0;
+    x.impactD1=x.deliveredD1+x.deliveringD1+x.onHoldD1;x.stationsList=Object.keys(x.stations);return x;
+  });
+}
+function buildDropTable(items,kind){
+  if(!items.length)return '<div class="drop-empty">Nenhum ofensor identificado nos dados selecionados.</div>';
+  var html='<div class="tableWrap" style="max-height:330px"><table class="drop-table"><thead><tr>';
+  html+='<th>'+((kind==="driver")?"Drive":"Operação")+'</th>';
+  if(kind==="driver")html+='<th>Operação</th>';
+  html+='<th>DS D0</th><th>Δ DS</th><th>Δ Pendência</th><th>Impacto</th></tr></thead><tbody>';
+  items.slice(0,10).forEach(function(x){
+    html+='<tr><td><b>'+esc(x.name)+'</b></td>';
+    if(kind==="driver")html+='<td>'+esc(x.stationsList.join(", ")||"N/A")+'</td>';
+    html+='<td class="'+(x.newDs<95?"drop-neg":"drop-pos")+'">'+pct(x.newDs)+'</td>';
+    html+='<td class="'+(x.dsDelta<0?"drop-neg":"drop-pos")+'">'+signedPct(x.dsDelta)+'</td>';
+    html+='<td class="'+(x.pendingDelta>0?"drop-neg":"drop-pos")+'">'+(x.pendingDelta>0?"+":"")+fmt(x.pendingDelta)+'</td>';
+    html+='<td class="drop-neg">'+pct(x.contribution)+'</td></tr>';
+  });
+  return html+'</tbody></table></div>';
+}
+function openDropSummary(){
+  var rows=getFiltered(),dates=Array.from(new Set(rows.map(function(r){return r.date;}).filter(Boolean))).sort();
+  if(dates.length<2){alert("Carregue uma base com pelo menos 2 dias para gerar o resumo da queda.");return;}
+  var prevDate=dates[dates.length-2],newDate=dates[dates.length-1];
+  var prevRows=rows.filter(function(r){return r.date===prevDate;}),newRows=rows.filter(function(r){return r.date===newDate;});
+  var old=sumRows(prevRows),cur=sumRows(newRows),dsDelta=cur.ds-old.ds;
+  var oldBy=dropGroupBy(prevRows,"driver"),newBy=dropGroupBy(newRows,"driver"),oldMap={};
+  oldBy.forEach(function(x){oldMap[x.name]=x;});
+  var drivers=newBy.map(function(n){
+    var o=oldMap[n.name]||{pendingD0:0,ds:0};
+    var extra=Math.max(0,n.pendingD0-(o.pendingD0||0));
+    return {name:n.name,stationsList:n.stationsList,newDs:n.ds,dsDelta:n.ds-(o.ds||0),pendingDelta:n.pendingD0-(o.pendingD0||0),contribution:cur.total?extra/cur.total*100:0};
+  }).filter(function(x){return x.newDs<95||x.contribution>0;}).sort(function(a,b){return b.contribution-a.contribution;});
+  var oldStations=dropGroupBy(prevRows,"station"),newStations=dropGroupBy(newRows,"station"),oldStMap={};
+  oldStations.forEach(function(x){oldStMap[x.name]=x;});
+  var stations=newStations.map(function(n){
+    var o=oldStMap[n.name]||{pendingD0:0,ds:0};
+    var extra=Math.max(0,n.pendingD0-(o.pendingD0||0));
+    return {name:n.name,stationsList:n.stationsList,newDs:n.ds,dsDelta:n.ds-(o.ds||0),pendingDelta:n.pendingD0-(o.pendingD0||0),contribution:cur.total?extra/cur.total*100:0};
+  }).filter(function(x){return x.newDs<95||x.pendingDelta>0;}).sort(function(a,b){return b.contribution-a.contribution;});
+  var reasons=[
+    {name:"Pendência D0",old:old.pendingD0,cur:cur.pendingD0},
+    {name:"Delivering D0",old:old.deliveringD0,cur:cur.deliveringD0},
+    {name:"On Hold D0",old:old.onHoldD0,cur:cur.onHoldD0},
+    {name:"Impacto D+1",old:old.impactD1,cur:cur.impactD1}
+  ];
+  reasons.forEach(function(r){r.delta=r.cur-r.old;});reasons.sort(function(a,b){return b.delta-a.delta;});
+  var topDrivers=drivers.filter(function(x){return x.contribution>0;}).slice(0,3),topReason=reasons[0];
+  var narrative;
+  if(dsDelta<0){
+    narrative='Entre <b>'+prevDate+'</b> e <b>'+newDate+'</b>, o DS D0 caiu de <b>'+pct(old.ds)+'</b> para <b>'+pct(cur.ds)+'</b>, uma variação de <b>'+signedPct(dsDelta)+'</b>. ';
+    narrative+='A pendência D0 passou de <b>'+fmt(old.pendingD0)+'</b> para <b>'+fmt(cur.pendingD0)+'</b>. ';
+    if(topDrivers.length)narrative+='Os principais drivers associados ao aumento da pendência foram <b>'+topDrivers.map(function(x){return esc(x.name);}).join(", ")+'</b>. ';
+    if(topReason&&topReason.delta>0)narrative+='Entre os componentes monitorados, <b>'+topReason.name+'</b> teve o maior aumento: <b>'+fmt(topReason.old)+'</b> → <b>'+fmt(topReason.cur)+'</b>.';
+  }else{
+    narrative='Entre <b>'+prevDate+'</b> e <b>'+newDate+'</b>, não houve queda de DS D0: o indicador variou de <b>'+pct(old.ds)+'</b> para <b>'+pct(cur.ds)+'</b> (<b>'+signedPct(dsDelta)+'</b>). O painel abaixo mostra as principais mudanças.';
+  }
+  var reasonRows=reasons.map(function(r){return '<tr><td><b>'+esc(r.name)+'</b></td><td>'+fmt(r.old)+'</td><td>'+fmt(r.cur)+'</td><td class="'+(r.delta>0?"drop-neg":"drop-pos")+'">'+(r.delta>0?"+":"")+fmt(r.delta)+'</td></tr>';}).join("");
+  $("dropSummaryPeriod").innerHTML=prevDate+' → '+newDate+' · '+fmt(rows.length)+' registros considerados pelos filtros atuais';
+  $("dropSummaryContent").innerHTML=
+    '<div class="drop-hero">'+
+    '<div class="drop-kpi"><div class="k">DS D0 anterior</div><div class="v">'+pct(old.ds)+'</div><div class="delta">Dia '+prevDate+'</div></div>'+
+    '<div class="drop-kpi"><div class="k">DS D0 atual</div><div class="v">'+pct(cur.ds)+'</div><div class="delta">Dia '+newDate+'</div></div>'+
+    '<div class="drop-kpi"><div class="k">Variação</div><div class="v '+(dsDelta<0?"drop-neg":"drop-pos")+'">'+signedPct(dsDelta)+'</div><div class="delta">'+(dsDelta<0?"queda":"melhora")+' do indicador</div></div>'+
+    '<div class="drop-kpi"><div class="k">Pendência D0</div><div class="v">'+fmt(cur.pendingD0)+'</div><div class="delta '+(cur.pendingD0-old.pendingD0>0?"drop-neg":"drop-pos")+'">'+(cur.pendingD0-old.pendingD0>0?"+":"")+fmt(cur.pendingD0-old.pendingD0)+' vs. dia anterior</div></div></div>'+
+    '<div class="drop-section"><h3>🧠 O que aconteceu?</h3><div class="drop-narrative">'+narrative+'</div></div>'+
+    '<div class="drop-grid"><div class="drop-section"><h3>🚨 Drivers que mais explicam a mudança</h3><div class="desc">Ordenados pelo aumento de pacotes não entregues no D0.</div>'+buildDropTable(drivers,"driver")+'</div>'+
+    '<div class="drop-section"><h3>🏭 Operações que mais mudaram</h3><div class="desc">Variação de DS e pendência D0 por operação.</div>'+buildDropTable(stations,"station")+'</div></div>'+
+    '<div class="drop-section"><h3>📦 Onde surgiu o problema?</h3><div class="tableWrap" style="max-height:260px"><table class="drop-table"><thead><tr><th>Indicador</th><th>Dia anterior</th><th>Dia atual</th><th>Variação</th></tr></thead><tbody>'+reasonRows+'</tbody></table></div></div>'+
+    '<div class="drop-section"><h3>📌 Leitura operacional</h3><div class="drop-narrative">O resumo cruza <b>DS D0 + pendência D0 + Delivering D0 + On Hold D0 + impacto D+1</b> para identificar os drivers e operações que mais mudaram entre os dois dias. Os nomes apresentados podem ser usados nos filtros do dashboard para aprofundar a investigação.</div></div>';
+  $("dropSummaryModal").classList.add("open");
+}
+function closeDropSummary(){$("dropSummaryModal").classList.remove("open");}
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeDropSummary();});
+
+function showATsPopup(el,idx){
+  var sorted=window._rankingSorted||[];
+  if(!sorted[idx])return;
+  /* Remove any existing popup */
+  var old=document.querySelector(".at-popup");if(old)old.remove();
+  var oldBg=document.querySelector(".at-backdrop");if(oldBg)oldBg.remove();
+  var r=sorted[idx];
+  var ats=r.atsList||[];
+  /* Backdrop to close on click outside */
+  var bg=document.createElement("div");bg.className="at-backdrop";
+  bg.addEventListener("click",function(){bg.remove();popup.remove();});
+  document.body.appendChild(bg);
+  /* Popup positioned near the clicked element */
+  var popup=document.createElement("div");
+  popup.className="at-popup";
+  popup.innerHTML='<button class="at-close" title="Fechar">✕</button><h3>'+esc(driverLabel(r))+' — '+ats.length+' AT(s)</h3><div class="at-list">'+ats.map(function(a){return esc(a);}).join("<br>")+'</div>';
+  popup.querySelector(".at-close").addEventListener("click",function(){bg.remove();popup.remove();});
+  document.body.appendChild(popup);
+  /* Position near the clicked cell */
+  var rect=el.getBoundingClientRect();
+  popup.style.top=(rect.bottom+window.scrollY+4)+"px";
+  popup.style.left=Math.min(rect.left+window.scrollX, window.innerWidth-440)+"px";
+}
+
+function exportCSV(){
+  var rows=getFiltered();if(!rows.length){alert("Nenhum dado.");return;}
+  var hd=["date","at","driver","vehicle","range","classification","total","dsD0","dsD1","deliveredD0","deliveringD0","onHoldD0","onHoldD1","deliveredD1","deliveringD1","notaDS"];
+  var lb=["Data","AT","Drive","Veículo","Range","Classificação","Expedido","DS D0 (%)","DS D1 (%)","Delivered D0","Delivering D0","On Hold D0","On Hold D1","Delivered D1","Delivering D1","Nota DS"];
+  var csv=lb.join(";")+"\n";
+  rows.forEach(function(r){csv+=hd.map(function(h){var v=r[h];if(v==null)v="";return typeof v==="number"?String(v).replace(".",","):'"'+String(v).replace(/"/g,'""')+'"';}).join(";")+"\n";});
+  var blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="driver_performance.csv";a.click();
+}
+
+function exportRecurrence(){
+  var arr=window._lastRecurrence||[];
+  if(!arr.length){alert("Carregue pelo menos 2 dias para analisar recorrência.");return;}
+  var headers=["Drive","Driver ID","Operação","Dias analisados","Dias como ofensor","Recorrência (%)","DS médio (%)","Pior DS (%)","Pendência D0","Status"];
+  var csv=headers.join(";")+"\n";
+  arr.forEach(function(x){
+    csv+=[x.driver,x.driverId,x.stationsList.join(", "),x.daysCount,x.offDays,x.recurrence.toFixed(1).replace(".",","),x.avg.toFixed(2).replace(".",","),x.worst.toFixed(2).replace(".",","),x.pending,x.status].map(function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"';}).join(";")+"\n";
+  });
+  var blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="recorrencia_ofensores_drive.csv";a.click();
+}
+
+function exportOffenders(){
+  var off=window._lastOffenders||[];
+  if(!off.length){alert("Nenhum ofensor para exportar.");return;}
+  var headers=["Driver ID","Drive","HUB","Classificação","Veículo","DS D0 (%)","Total Expedido","Delivered D0","Delivering D0","On Hold D0","Pendência D0","Delivered D1","Delivering D1","On Hold D1","Impacto D+1","Nota DS","Justificativa","Plano de Ação"];
+  var csv=headers.join(";")+"\n";
+  off.forEach(function(r){
+    var row=[
+      '"'+(r.driverId||"").replace(/"/g,'""')+'"',
+      '"'+r.driver.replace(/"/g,'""')+'"',
+      '"'+(r.stationsList.join(", ")||"N/A").replace(/"/g,'""')+'"',
+      '"'+r.classification.replace(/"/g,'""')+'"',
+      '"'+(r.vehicle||"").replace(/"/g,'""')+'"',
+      r.dsD0.toFixed(2).replace(".",","),
+      String(r.total),
+      String(r.deliveredD0),
+      String(r.deliveringD0),
+      String(r.onHoldD0),
+      String(r.pendingD0),
+      String(r.deliveredD1),
+      String(r.deliveringD1),
+      String(r.onHoldD1),
+      String(r.impactD1),
+      r.notaDS.toFixed(2).replace(".",","),
+      '""',
+      '""'
+    ];
+    csv+=row.join(";")+"\n";
+  });
+  var blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="ofensores_ds_d0_plano_acao.csv";a.click();
+}
+
+function loadXLSXLib(){
+  if(window.XLSX)return Promise.resolve();
+  return new Promise(function(ok,no){var s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";s.onload=ok;s.onerror=function(){no(new Error("Falha ao carregar biblioteca XLSX."));};document.head.appendChild(s);});
+}
+
+$("fileInput").addEventListener("change",function(e){
+  var file=e.target.files[0];if(!file)return;
+  showStatus("⏳ Lendo arquivo…");
+  loadXLSXLib().then(function(){return file.arrayBuffer();}).then(function(buf){
+    showStatus("⏳ Processando planilha…");
+    /* Use setTimeout(0) to let the status bar paint */
+    setTimeout(function(){
+      try{
+        var wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});
+        if(!wb.SheetNames.length)throw new Error("Nenhuma aba encontrada.");
+        var raw=[];
+        for(var i=0;i<wb.SheetNames.length;i++){
+          var ws=wb.Sheets[wb.SheetNames[i]];
+          var sheetRows=XLSX.utils.sheet_to_json(ws,{defval:null,raw:true,blankrows:false});
+          if(sheetRows.length){raw=sheetRows;break;}
+        }
+        if(!raw.length)throw new Error("Arquivo sem dados.");
+
+        /* Chunked normalize to avoid freezing on large files */
+        var parsed=new Array(raw.length);
+        var CHUNK=10000, idx=0;
+        function processChunk(){
+          var end=Math.min(idx+CHUNK,raw.length);
+          for(var ri=idx;ri<end;ri++){
+            var row=raw[ri],clean={},keys=Object.keys(row);
+            for(var ki=0;ki<keys.length;ki++){var k=keys[ki],v=row[k];if(typeof v==="number"&&!Number.isFinite(v))v=0;clean[k]=v;}
+            parsed[ri]=normalizeRow(clean);
+          }
+          idx=end;
+          if(idx<raw.length){
+            showStatus("⏳ Processando… "+Math.round(idx/raw.length*100)+"%");
+            setTimeout(processChunk,0);
+          } else {
+            finishLoad();
+          }
+        }
+        function finishLoad(){
+          var need=["at","driver","total","dsD0","classification"];
+          var miss=need.filter(function(k){
+            for(var mi=0;mi<Math.min(parsed.length,100);mi++){var v=parsed[mi][k];if(v!==undefined&&v!==""&&v!==null)return false;}
+            return true;
+          });
+          if(miss.length){showStatus("❌ Colunas não encontradas: "+miss.join(", "),true);return;}
+          data=parsed;
+          showStatus("⏳ Montando filtros…");
+          setTimeout(function(){
+            setupFilters();
+            ["fRegional","fStation","fDate","fDriverId","fDriver","fAT","fVehicle","fRange","fClass"].forEach(clearSelect);
+            $("fSearch").value="";
+            render();
+            var nDr=new Set();for(var di=0;di<data.length;di++){if(data[di].driver)nDr.add(data[di].driver);}
+            var dates=unique("date");
+            var periodTxt=dates.length>1?dates[0]+" a "+dates[dates.length-1]+" ("+dates.length+" dias)":dates.length===1?dates[0]:"";
+            showStatus("✅ "+fmt(data.length)+" registros | "+fmt(nDr.size)+" drives | Período: "+periodTxt);
+          },0);
+        }
+        processChunk();
+      }catch(err){
+        console.error(err);showStatus("❌ "+err.message,true);
+      }
+    },50); /* 50ms delay lets the "Processando" message paint */
+  }).catch(function(err){console.error(err);showStatus("❌ "+err.message,true);}).finally(function(){e.target.value="";});
+});
+
+/* Welcome overlay */
+$("welcomeFileInput").addEventListener("change",function(e){
+  var mainInput=$("fileInput");var dt=new DataTransfer();
+  if(e.target.files[0])dt.items.add(e.target.files[0]);
+  mainInput.files=dt.files;mainInput.dispatchEvent(new Event("change"));e.target.value="";
+});
+var origShowStatus=showStatus;
+showStatus=function(msg,isErr){origShowStatus(msg,isErr);if(!isErr){var ov=$("welcomeOverlay");if(ov)ov.style.display="none";}};
+if(data.length>0){var ov=$("welcomeOverlay");if(ov)ov.style.display="none";}
+
+/* ── Detail table sorting ── */
+var _detailSort={key:null,asc:true};
+var NUMERIC_SORT_KEYS={total:1,dsD0:1,dsD1:1,deliveredD0:1,deliveringD0:1,onHoldD0:1,onHoldD1:1,deliveredD1:1,deliveringD1:1,notaDS:1,pendingD0:1,impactD1:1};
+
+function sortDetailRows(rows,key,asc){
+  var isNum=NUMERIC_SORT_KEYS[key];
+  var sorted=rows.slice().sort(function(a,b){
+    var va=a[key],vb=b[key];
+    if(va==null)va=isNum?0:"";
+    if(vb==null)vb=isNum?0:"";
+    var cmp;
+    if(isNum){cmp=(va-vb);}
+    else{cmp=String(va).localeCompare(String(vb),"pt-BR");}
+    return asc?cmp:-cmp;
+  });
+  return sorted;
+}
+
+function updateSortArrows(){
+  var ths=document.querySelectorAll("#detailHead th[data-sort]");
+  ths.forEach(function(th){
+    th.classList.remove("sort-active");
+    var arrow=th.querySelector(".sort-arrow");
+    if(!arrow){arrow=document.createElement("span");arrow.className="sort-arrow";th.appendChild(arrow);}
+    arrow.textContent="▲";
+    if(_detailSort.key===th.getAttribute("data-sort")){
+      th.classList.add("sort-active");
+      arrow.textContent=_detailSort.asc?"▲":"▼";
+    }
+  });
+}
+
+document.addEventListener("click",function(e){
+  var th=e.target.closest("#detailHead th[data-sort]");
+  if(!th)return;
+  var key=th.getAttribute("data-sort");
+  if(_detailSort.key===key){_detailSort.asc=!_detailSort.asc;}
+  else{_detailSort.key=key;_detailSort.asc=NUMERIC_SORT_KEYS[key]?false:true;} /* numbers default desc, text default asc */
+  updateSortArrows();
+  render();
+});
+
+initMultiDropdowns();setupFilters();render();
+console.log("Dashboard OK:",data.length,"registros");
+
+/* ── Theme toggle ── */
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme",t);
+  var btn=$("themeBtn");
+  if(btn) btn.textContent=t==="light"?"☀️":"🌙";
+  try{localStorage.setItem("ct-theme",t);}catch(e){}
+}
+function toggleTheme(){
+  var cur=document.documentElement.getAttribute("data-theme")||"dark";
+  var next=cur==="dark"?"light":"dark";
+  applyTheme(next);
+  /* Update only chart legend/label colors without full re-render */
+  var textColor=next==="light"?"#172033":"#fff";
+  Object.keys(charts).forEach(function(k){
+    var c=charts[k]; if(!c)return;
+    if(c.options&&c.options.plugins&&c.options.plugins.legend&&c.options.plugins.legend.labels){
+      c.options.plugins.legend.labels.color=textColor;
+    }
+    c.update("none"); /* "none" = no animation, instant */
+  });
+}
+(function(){
+  var saved="dark";
+  try{saved=localStorage.getItem("ct-theme")||"dark";}catch(e){}
+  applyTheme(saved);
+})();
+
+</script>
+</body>
+</html>
