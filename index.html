@@ -307,10 +307,49 @@ function parseNum(v){
   else if(x.indexOf(",")>=0)x=x.replace(",",".");
   var n=Number(x);return Number.isFinite(n)?n:0;
 }
+/* ── Datas: aceita "2026-11-09", "2026-11-09 14:09:18", "2026-11-09T14:09:18",
+   "09/11/2026", "09/11/2026 14:09:18", serial do Excel (46335.589...) e objetos Date.
+   A hora é sempre descartada: o dash trabalha por dia (AAAA-MM-DD). ── */
+function pad2(n){return String(n).padStart(2,"0");}
+function ymd(y,m,d){y=Number(y);m=Number(m);d=Number(d);if(y<100)y+=2000;
+  if(!(m>=1&&m<=12&&d>=1&&d<=31))return "";return y+"-"+pad2(m)+"-"+pad2(d);}
+function excelSerialToYMD(n){
+  /* Serial do Excel -> data, em UTC para não sofrer com fuso horário. Arredonda ao segundo. */
+  var d=new Date(Date.UTC(1899,11,30)+Math.round(n*86400)*1000);
+  return ymd(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate());
+}
 function fmtDate(v){
-  if(!v)return "";if(v instanceof Date){var y=v.getFullYear(),m=String(v.getMonth()+1).padStart(2,"0"),d=String(v.getDate()).padStart(2,"0");return y+"-"+m+"-"+d;}
-  var s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
-  var d2=new Date(s);if(!isNaN(d2.getTime()))return d2.getFullYear()+"-"+String(d2.getMonth()+1).padStart(2,"0")+"-"+String(d2.getDate()).padStart(2,"0");return s;
+  if(v===null||v===undefined||v==="")return "";
+  if(v instanceof Date){if(isNaN(v.getTime()))return "";return ymd(v.getFullYear(),v.getMonth()+1,v.getDate());}
+  if(typeof v==="number"){if(v>59&&v<2958466)return excelSerialToYMD(v);return String(v);}
+  var s=String(v).replace(/ /g," ").trim().replace(/^'+/,"");if(!s)return "";
+  var m;
+  /* AAAA-MM-DD [hh:mm[:ss]] | AAAA/MM/DD ... | AAAA-MM-DDThh:mm:ss */
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:$|[\sT])/))){var r1=ymd(m[1],m[2],m[3]);if(r1)return r1;}
+  /* DD/MM/AAAA [hh:mm[:ss]] (padrão BR). Se o 2º número > 12, trata como MM/DD/AAAA. */
+  if((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})(?:$|[\s,T])/))){
+    var a=Number(m[1]),b=Number(m[2]);var r2=(b>12&&a<=12)?ymd(m[3],a,b):ymd(m[3],b,a);if(r2)return r2;}
+  /* Serial do Excel vindo como texto (ex.: "46335.5894") */
+  if(/^\d+([.,]\d+)?$/.test(s)){var n=Number(s.replace(",","."));if(n>59&&n<2958466)return excelSerialToYMD(n);}
+  var d2=new Date(s.replace(" ","T"));if(isNaN(d2.getTime()))d2=new Date(s);
+  if(!isNaN(d2.getTime()))return ymd(d2.getFullYear(),d2.getMonth()+1,d2.getDate());
+  return s;
+}
+/* Garante que a coluna de data chegue "crua" (serial do Excel ou texto original do CSV),
+   evitando a conversão automática do SheetJS (fuso horário / inversão dia-mês). */
+function fixDateColumn(ws,rawWs){
+  if(!ws||!ws["!ref"])return;
+  var rg=XLSX.utils.decode_range(ws["!ref"]),hr=rg.s.r;
+  for(var c=rg.s.c;c<=rg.e.c;c++){
+    var h=ws[XLSX.utils.encode_cell({r:hr,c:c})];
+    if(!h||aliasNorm[keyNorm(h.v)]!=="date")continue;
+    for(var r=hr+1;r<=rg.e.r;r++){
+      var addr=XLSX.utils.encode_cell({r:r,c:c}),cell=ws[addr];if(!cell)continue;
+      var rc=rawWs?rawWs[addr]:null;
+      if(rc&&rc.v!=null&&rc.v!==""){cell.t="s";cell.v=String(rc.v);}
+      else if(cell.v instanceof Date){cell.t="s";cell.v=fmtDate(cell.v);}
+    }
+  }
 }
 function normalizeRow(raw){
   var o={};Object.keys(raw).forEach(function(k){var t=aliasNorm[keyNorm(k)];if(t)o[t]=raw[k];});
@@ -1038,11 +1077,17 @@ $("fileInput").addEventListener("change",function(e){
     /* Use setTimeout(0) to let the status bar paint */
     setTimeout(function(){
       try{
-        var wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});
+        /* cellDates:false -> datas do Excel chegam como serial numérico (sem erro de fuso). */
+        var u8=new Uint8Array(buf);
+        var wb=XLSX.read(u8,{type:"array",cellDates:false});
         if(!wb.SheetNames.length)throw new Error("Nenhuma aba encontrada.");
+        /* CSV/TXT: relê sem interpretar valores, para pegar o texto original da coluna de data. */
+        var isText=/\.(csv|txt|tsv)$/i.test(file.name||"");
+        var rawWb=isText?XLSX.read(u8,{type:"array",raw:true}):null;
         var raw=[];
         for(var i=0;i<wb.SheetNames.length;i++){
           var ws=wb.Sheets[wb.SheetNames[i]];
+          fixDateColumn(ws,rawWb?rawWb.Sheets[wb.SheetNames[i]]:null);
           var sheetRows=XLSX.utils.sheet_to_json(ws,{defval:null,raw:true,blankrows:false});
           if(sheetRows.length){raw=sheetRows;break;}
         }
